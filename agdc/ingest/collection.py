@@ -53,6 +53,7 @@ from .ingest_db_wrapper import IngestDBWrapper
 
 
 
+
 # Set up logger.
 LOGGER = logging.getLogger(__name__)
 
@@ -193,6 +194,7 @@ class Collection(object):
     def create_tile_contents(self, tile_type_id, tile_footprint,
                              band_stack, tile_output_path=None):
         """Factory method to create an instance of the TileContents class.
+
 
         The tile_type_dict contains the information required for
         resampling extents and resolution.

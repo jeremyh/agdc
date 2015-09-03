@@ -55,6 +55,7 @@ from .mosaic_contents import MosaicContents
 from .tile_record import TileRecord, TileRepository
 
 
+
 # Set up logger.
 LOGGER = logging.getLogger(__name__)
 
@@ -450,6 +451,7 @@ class DatasetRecord(object):
             return osr.CoordinateTransformation(dataset_spatial_reference,
                                                 tile_spatial_reference)
         except Exception:
+            LOGGER.exception('Coordinate transform error')
             raise DatasetError('Coordinate transformation error ' +
                                'for transforming %s to %s' %
                                (str(dataset_crs), str(tile_crs)))

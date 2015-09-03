@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from __future__ import division
 
-from abc import abstractmethod
 from collections import OrderedDict
 from datetime import datetime
 import logging
@@ -114,30 +113,7 @@ class PreTiledBandstack(AbstractBandstack):
         raise RuntimeError('Pre-tiled ingestion does not need reprojection: No VRT option available.')
 
 
-class PreTiledDataset(AbstractDataset):
-    """
-    A dataset that has already been tiled: It should provide type
-    and footprint (x,y) information.
-    """
-    @abstractmethod
-    def get_tile_type_id(self):
-        """The tile type id.
-        :rtype int"""
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_tile_footprint(self):
-        """(x,y) footprint of tile.
-        :rtype: (int, int)
-        """
-        raise NotImplementedError
-
-
-class GdalMdDataset(PreTiledDataset):
-    """
-    A Pre-tiled Dataset whose metadata is read from Gdal metadata.
-    """
-
+class SimpleDataset(AbstractDataset):
     def __init__(self, dataset_path):
         #: :type: gdal.Dataset
         self._path = dataset_path
@@ -147,10 +123,7 @@ class GdalMdDataset(PreTiledDataset):
 
         self._ul, self._ll, self._lr, self._ur = _get_extent_gdal(self._ds)
 
-        super(GdalMdDataset, self).__init__()
-
-    def get_processing_level(self):
-        return self._md.get('level_name')
+        super(SimpleDataset, self).__init__()
 
     def get_x_pixels(self):
         return self._ds.RasterXSize
@@ -158,12 +131,61 @@ class GdalMdDataset(PreTiledDataset):
     def get_y_pixels(self):
         return self._ds.RasterYSize
 
+
     def get_datetime_processed(self):
         t = os.path.getctime(self._path)
         return datetime.utcfromtimestamp(t)
 
     def get_geo_transform(self):
         return self._ds.GetGeoTransform()
+
+    def get_dataset_size(self):
+        return _get_file_size(self._path)
+
+    def get_xml_text(self):
+        return None  # N/A?
+
+    def get_dataset_path(self):
+        return self._path
+
+    def get_mtl_text(self):
+        return None  # N/A?
+
+    def get_projection(self):
+        return self._ds.GetProjection()
+
+    def get_ll_lat(self):
+        return self._ll[1]
+
+    def get_ll_lon(self):
+        return self._ll[0]
+
+    def get_ul_lat(self):
+        return self._ul[0]
+
+    def get_ul_lon(self):
+        return self._ul[1]
+
+    def get_lr_lat(self):
+        return self._lr[0]
+
+    def get_lr_lon(self):
+        return self._lr[1]
+
+    def get_ur_lat(self):
+        return self._ur[0]
+
+    def get_ur_lon(self):
+        return self._ur[1]
+
+
+class GdalMdDataset(SimpleDataset):
+    """
+    A Pre-tiled Dataset whose metadata is read from Gdal metadata.
+    """
+
+    def get_processing_level(self):
+        return self._md.get('level_name')
 
     def get_x_ref(self):
         # Path for landsat, otherwise none. Should we support other Satellite schemes?
@@ -179,15 +201,6 @@ class GdalMdDataset(PreTiledDataset):
     def get_gcp_count(self):
         return self._get_int_param('gcp_count')
 
-    def get_dataset_size(self):
-        return _get_file_size(self._path)
-
-    def get_xml_text(self):
-        return None  # N/A?
-
-    def get_dataset_path(self):
-        return self._path
-
     def get_sensor_name(self):
         sensor_name = self._md.get('sensor_name')
 
@@ -197,9 +210,6 @@ class GdalMdDataset(PreTiledDataset):
             return 'ETM+'
 
         return sensor_name
-
-    def get_mtl_text(self):
-        return None  # N/A?
 
     def _get_date_param(self, param_name):
         val = self._md.get(param_name)
@@ -233,42 +243,18 @@ class GdalMdDataset(PreTiledDataset):
     def get_cloud_cover(self):
         return self._get_float_param('cloud_cover')
 
-    def get_projection(self):
-        return self._ds.GetProjection()
 
-    def get_ll_lat(self):
-        return self._ll[1]
+class PreTiledDataset(GdalMdDataset):
+    """
+    A dataset that has already been tiled: It should provide type
+    and footprint (x,y) information.
+    """
 
-    def get_ll_lon(self):
-        return self._ll[0]
+    def get_tile_type_id(self):
+        return int(self._md['tile_type_id'])
 
-    def get_ul_lat(self):
-        return self._ul[0]
-
-    def get_ul_lon(self):
-        return self._ul[1]
-
-    def get_lr_lat(self):
-        return self._lr[0]
-
-    def get_lr_lon(self):
-        return self._lr[1]
-
-    def get_ur_lat(self):
-        return self._ur[0]
-
-    def get_ur_lon(self):
-        return self._ur[1]
-
-    # ?
-    get_ll_x = get_ll_lon
-    get_ll_y = get_ll_lat
-    get_lr_x = get_lr_lon
-    get_lr_y = get_lr_lat
-    get_ur_x = get_ur_lon
-    get_ur_y = get_ur_lat
-    get_ul_x = get_ul_lon
-    get_ul_y = get_ul_lat
+    def get_tile_footprint(self):
+        return int(self._md['x_index']), int(self._md['y_index'])
 
     def find_band_file(self, file_pattern):
         return self._path
@@ -276,13 +262,15 @@ class GdalMdDataset(PreTiledDataset):
     def stack_bands(self, band_dict):
         return PreTiledBandstack(self, band_dict)
 
-    # Pre-tiled information:
-
-    def get_tile_type_id(self):
-        return int(self._md['tile_type_id'])
-
-    def get_tile_footprint(self):
-        return int(self._md['x_index']), int(self._md['y_index'])
+    # TODO: This assumes 1degr tiles, where tile numbers correspond to lat/lon.
+    get_ll_x = GdalMdDataset.get_ll_lon
+    get_ll_y = GdalMdDataset.get_ll_lat
+    get_lr_x = GdalMdDataset.get_lr_lon
+    get_lr_y = GdalMdDataset.get_lr_lat
+    get_ur_x = GdalMdDataset.get_ur_lon
+    get_ur_y = GdalMdDataset.get_ur_lat
+    get_ul_x = GdalMdDataset.get_ul_lon
+    get_ul_y = GdalMdDataset.get_ul_lat
 
 
 class PreTiledIngester(SourceFileIngester):

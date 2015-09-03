@@ -39,7 +39,9 @@
 from __future__ import absolute_import
 
 from abc import abstractmethod, ABCMeta
+
 from agdc.compat import with_metaclass
+
 
 class AbstractBandstack(with_metaclass(ABCMeta)):
     """

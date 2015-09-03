@@ -303,6 +303,8 @@ class AbstractIngester(with_metaclass(ABCMeta)):
         If fast filtering is turned on via the command line arguments it
         is done here, that is datasets that are filtered out should not
         be part of the list returned.
+
+        :rtype: list[str]
         """
 
         raise NotImplementedError
@@ -317,17 +319,19 @@ class AbstractIngester(with_metaclass(ABCMeta)):
         Dataset objects differ for different types of dataset, but
         should present the same interface to the database classes. They
         contain the dataset path.
-        """
 
+        :type dataset_path: str
+        :rtype: agdc.ingest.AbstractDataset
+        """
         raise NotImplementedError
 
     def preprocess_dataset(self, dataset_list):
-        """Performs pre-processing on the dataset_list object.
+        """Performs pre-processing on the dataset_list object, potentially
+        returning a different list of datasets to replace them.
 
-        dataset_list: list of datasets to be opened and have
-           its metadata read.
+        :type dataset_list: list[str]
+        :rtype: list[str]
         """
-
         return dataset_list
 
     #
@@ -570,6 +574,8 @@ def run_ingest(ingester_class):
 
     if ingester.args.debug:
         logging.getLogger('agdc.ingest').setLevel(logging.DEBUG)
+        logging.getLogger('agdc').setLevel(logging.INFO)
+        logging.getLogger('agdc.ingest.ingest_db_wrapper').setLevel(logging.INFO)
 
     ingester.ingest(ingester.args.source_dir)
 
