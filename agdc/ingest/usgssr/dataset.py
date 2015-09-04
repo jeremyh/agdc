@@ -86,11 +86,14 @@ class LandsatUsgsSrDataset(SimpleDataset):
         # From: CONUS_2.8_1.4_LC80470272014034LGN00_sr_band.tif
         # Extract each number in: 2.8_1.4
         # Where (2, 1) is the source coords, and .8/.4 are the sub sections of those tiles.
-        components = self._dataset_path.name.split('_')
+        components = self._dataset_path.stem.split('_')
         x_maj_min = components[1].split('.')
         y_maj_min = components[2].split('.')
         self.x_ref = int(x_maj_min[0]), int(x_maj_min[1])
         self.y_ref = int(y_maj_min[0]), int(y_maj_min[1])
+
+        # Eg. 'USGS_SR_BAND'
+        self._processing_level_code = ('usgs_' + ('_'.join(components[4:]))).upper()
 
         super(LandsatUsgsSrDataset, self).__init__(dataset_path)
 
@@ -136,7 +139,11 @@ class LandsatUsgsSrDataset(SimpleDataset):
 
         The combination of satellite_tag and sensor_name must be unique.
         """
-        return self._md['instrument']
+        sensor = self._md['instrument']
+        if sensor == 'ETM':
+            return 'ETM+'
+
+        return sensor
 
     def get_processing_level(self):
         """A short string identifying the processing level or product.
@@ -144,7 +151,7 @@ class LandsatUsgsSrDataset(SimpleDataset):
         The processing level must be unique for each satellite and sensor
         combination.
         """
-        return 'USGSSR'
+        return self._processing_level_code
 
     def get_x_ref(self):
         return int(self._wrs_info['path'])
@@ -217,6 +224,7 @@ class LandsatUsgsSrDataset(SimpleDataset):
         return PreTiledBandstack(self, band_dict)
 
     def get_tile_type_id(self):
+        # Corresponds to 'Conus Albers WGS84 quarter degree' in v7__usgs_sr.sql
         return 6
 
     def get_tile_footprint(self):
